@@ -1,11 +1,18 @@
 var builder = DistributedApplication.CreateBuilder(args);
 #pragma warning disable ASPIRECERTIFICATES001
 
+// Docker Compose Generation
+var dockerCompose = builder.AddDockerComposeEnvironment("production")
+    .WithDashboard(cfg => cfg.WithHostPort(8080));
+
 // Keycloak Authentication Service
 var keycloak = builder
     .AddKeycloak("keycloak", 6001)
-    .WithoutHttpsCertificate()
-    .WithDataVolume("keycloak-data");
+    .WithDataVolume("keycloak-data")
+    .WithEnvironment("KC_HTTP_ENABLED", "true")
+    .WithEnvironment("KC_HOSTNAME_STRICT", "false")
+    .WithEndpoint(6001,8080, "keycloak", isExternal:true)
+    .WithRealmImport("../infra/realms");
 
 // Postgres Service
 var postgres = builder
@@ -24,7 +31,9 @@ var rabbitMq = builder.AddRabbitMQ("messaging")
 var typesenseSecret = builder.AddParameter("typesense-api-key", secret: true);
 var typesense = builder
     .AddContainer("typesense", "typesense/typesense", "29.0")
-    .WithArgs("--data-dir", "/data", "--api-key", typesenseSecret, "--enable-cors")
+    .WithEnvironment("TYPESENSE_DATA_DIR", "/data")
+    .WithEnvironment("TYPESENSE_ENABLE_CORS", "true")
+    .WithEnvironment("TYPESENSE_API_KEY", typesenseSecret)
     .WithVolume("typesense-data", "/data")
     .WithHttpEndpoint(8108, 8108, name: "typesense");
 
@@ -48,5 +57,16 @@ var searchService = builder.
     .WithReference(rabbitMq)
     .WaitFor(rabbitMq)
     .WaitFor(typesense);
+
+// Reverse Proxy for services
+var yarp = builder.AddYarp("gateway")
+    .WithConfiguration(cfg =>
+    {
+        cfg.AddRoute("/questions/{**catch-all}", questionService);
+        cfg.AddRoute("/tags/{**catch-all}", questionService);
+        cfg.AddRoute("/search/{**catch-all}", searchService);
+    })
+    .WithEnvironment("ASPNETCORE_URLS", "http://*:8001")
+    .WithEndpoint(8001, 8001, scheme: "http", name: "gateway", isExternal: true);
 
 builder.Build().Run();

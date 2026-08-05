@@ -1,5 +1,6 @@
 using System.Reflection.Metadata;
 using System.Text.RegularExpressions;
+using Helpers;
 using Microsoft.AspNetCore.Http.Extensions;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -32,33 +33,15 @@ builder.Services.AddTypesenseClient(config =>
     };
 });
 
-// Adds Open Telemetry for RabbitMQ
-builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
-{
-    traceProviderBuilder
-        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName))
-        .AddSource("Wolverine");
-});
-
 // RabbitMQ Service
-builder.Host.UseWolverine(opts =>
+await builder.UseWolverineWithRabbitMqAsync(opts =>
 {
-    opts.UseRuntimeCompilation();
-
-    // Typesense registers ITypesenseClient through an opaque factory.
-    // Allow Wolverine to resolve this specific dependency from DI.
-    opts.CodeGeneration
-        .AlwaysUseServiceLocationFor<ITypesenseClient>();
-
-    opts.UseRabbitMqUsingNamedConnection("messaging")
-        .AutoProvision();
-
     opts.ListenToRabbitQueue("questions.search", queue =>
     {
         queue.BindExchange("questions");
     });
+    opts.ApplicationAssembly = typeof(Program).Assembly;
 });
-
 
 var app = builder.Build();
 

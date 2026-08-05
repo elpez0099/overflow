@@ -1,8 +1,13 @@
+using System.Net.Sockets;
+using Helpers;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Polly;
 using QuestionService.Data;
 using QuestionService.Services;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 using Wolverine;
 using Wolverine.RabbitMQ;
 
@@ -29,20 +34,11 @@ builder.Services.AddAuthentication().AddKeycloakJwtBearer(serviceName: "keycloak
 // Adds database initialization and migration support
 builder.AddNpgsqlDbContext<QuestionDbContext>("questionDb");
 
-// Adds Open Telemetry for RabbitMQ
-builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
-{
-    traceProviderBuilder
-        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName))
-        .AddSource("Wolverine");
-});
-
 // RabbitMQ Service
-builder.Host.UseWolverine(opts =>
+await builder.UseWolverineWithRabbitMqAsync(opts =>
 {
-    opts.UseRuntimeCompilation();
-    opts.UseRabbitMqUsingNamedConnection("messaging").AutoProvision();
     opts.PublishAllMessages().ToRabbitExchange("questions");
+    opts.ApplicationAssembly = typeof(Program).Assembly;
 });
 
 var app = builder.Build();
