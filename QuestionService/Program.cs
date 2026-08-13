@@ -1,14 +1,7 @@
-using System.Net.Sockets;
 using Helpers;
 using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-using Polly;
 using QuestionService.Data;
 using QuestionService.Services;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Exceptions;
-using Wolverine;
 using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,11 +18,8 @@ builder.AddServiceDefaults();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TagService>();
 
-builder.Services.AddAuthentication().AddKeycloakJwtBearer(serviceName: "keycloak", realm: "overflow", options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.Audience = "overflow";
-});
+// Set keycloak authentication
+builder.Services.AddKeycloakAuthentication();
 
 // Adds database initialization and migration support
 builder.AddNpgsqlDbContext<QuestionDbContext>("questionDb");
@@ -50,6 +40,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Intended for role based access control RBAC
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

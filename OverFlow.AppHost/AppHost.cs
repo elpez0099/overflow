@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+
 var builder = DistributedApplication.CreateBuilder(args);
 #pragma warning disable ASPIRECERTIFICATES001
 
@@ -11,8 +13,10 @@ var keycloak = builder
     .WithDataVolume("keycloak-data")
     .WithEnvironment("KC_HTTP_ENABLED", "true")
     .WithEnvironment("KC_HOSTNAME_STRICT", "false")
-    .WithEndpoint(6001,8080, "keycloak", isExternal:true)
-    .WithRealmImport("../infra/realms");
+    //.WithEndpoint(6001,8080, "keycloak", isExternal:true)
+    .WithRealmImport("../infra/realms")
+    .WithEnvironment("VIRTUAL_HOST", "ID.overflow.local")
+    .WithEnvironment("VIRTUAL_PORT", "8080");
 
 // Postgres Service
 var postgres = builder
@@ -67,6 +71,15 @@ var yarp = builder.AddYarp("gateway")
         cfg.AddRoute("/search/{**catch-all}", searchService);
     })
     .WithEnvironment("ASPNETCORE_URLS", "http://*:8001")
-    .WithEndpoint(8001, 8001, scheme: "http", name: "gateway", isExternal: true);
+    .WithEndpoint(8001, 8001, scheme: "http", name: "gateway", isExternal: true)
+    .WithEnvironment("VIRTUAL_HOST", "api.overflow.local")
+    .WithEnvironment("VIRTUAL_PORT", "8001");
+
+if (!builder.Environment.IsDevelopment())
+{
+    builder.AddContainer("nginx-proxy", "nginxproxy/nginx-proxy","1.8")
+        .WithEndpoint(80,80, "nginx", isExternal: true)
+        .WithBindMount("/var/run/docker.sock", "/tmp/docker.sock", true);
+}
 
 builder.Build().Run();
