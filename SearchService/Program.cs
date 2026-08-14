@@ -95,7 +95,7 @@ app.MapGet("/search/similar-titles", async (string query, ITypesenseClient clien
 });
 
 
-
+// Nueva sintaxis para using. Se hace dispose al final del bloque donde la variable fue declarada
 using var scope = app.Services.CreateScope();
 var client = scope.ServiceProvider.GetRequiredService<ITypesenseClient>();
 await SearchInitializer.EnsureIndexExistsAsync(client);

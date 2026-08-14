@@ -14,8 +14,13 @@ builder.Services.AddOpenApi();
 // Adds telemetry and metrics
 builder.AddServiceDefaults();
 
-// DI
+// We tell .net to use cache based on RAM memory
+// The limitation is that the memory lives in a single node, it is not distributed
 builder.Services.AddMemoryCache();
+// En caso de querer usar redis para cache distribuido, aspire ya lo integra
+// var redis = builder.AddRedis("cache");
+
+// DI
 builder.Services.AddScoped<TagService>();
 
 // Set keycloak authentication
@@ -47,7 +52,12 @@ app.MapControllers();
 // Register endpoints for observability and health check of the app
 app.MapDefaultEndpoints();
 
+// app.Services representa a un contenedor de dependency injection
+// al usar CreateScope, se crea un nuevo scope dentro del contenedor
+// Esto permite tener control sobre el ciclo de vida del servicio
 using var scope =  app.Services.CreateScope();
+// Cada scope esta preparado para inyectar una instancia de un servicio
+// Para ello provee un service locator que permite pedir una instancia especifica de una clase o interfaz
 var services = scope.ServiceProvider;
 try
 {
